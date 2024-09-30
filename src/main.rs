@@ -1,6 +1,10 @@
-use std::str::FromStr;
-
-use glib::clone;
+use gtk::ffi::GtkDrawingArea;
+use rand::Rng;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::rc::Rc;
+// use std::str::FromStr;
+// use glib::clone;
 use gtk::gdk::{Display, RGBA};
 use gtk::{glib, Application, ApplicationWindow, Button, CssProvider, Orientation};
 use gtk::{prelude::*, DrawingArea};
@@ -29,54 +33,21 @@ fn load_css() {
     );
 }
 
-fn build_ui(app: &Application) {
-    let button = Button::builder()
-        .label("Press me!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-
-    button.add_css_class("esko");
-
+fn create_card() -> DrawingArea {
     let card = DrawingArea::builder()
-        .content_width(63 * 6)
-        .content_height(88 * 6)
+        .content_width(63 * 2)
+        .content_height(88 * 2)
         .build();
     card.add_css_class("card");
 
-    let poker_green = RGBA::parse("#1E5C3A").unwrap();
-    let card_white = RGBA::parse("#fefefe").unwrap();
+    let _poker_green = RGBA::parse("#1E5C3A").unwrap();
+    let _card_white = RGBA::parse("#fefefe").unwrap();
     let text_black = RGBA::parse("#101010").unwrap();
 
     card.set_draw_func(move |_, cr, _ctx_width, _ctx_height| {
-        // cr.set_source_color(&card_white);
-        // cr.paint().expect("Invalid cairo surface state");
-
-        let scale: f64 = 6.0;
+        let scale: f64 = 2.0;
         let x: f64 = 0.0;
         let y: f64 = 0.0;
-        // const PI: f64 = 3.14159;
-        // let width: f64 = 63.0 * scale;
-        // let height: f64 = 88.0 * scale;
-        // let radius: f64 = 5.0 * scale;
-
-        // This all can be done in CSS
-        // cr.arc(x + radius, y + radius, radius, PI, 3.0 * PI / 2.0);
-        // cr.arc(x + width - radius, y + radius, radius, 3.0 * PI / 2.0, 0.0);
-        // cr.arc(
-        //     x + width - radius,
-        //     y + height - radius,
-        //     radius,
-        //     0.0,
-        //     PI / 2.0,
-        // );
-        // cr.arc(x + radius, y + height - radius, radius, PI / 2.0, PI);
-        // cr.close_path();
-
-        // cr.set_source_color(&card_white);
-        // cr.fill();
 
         // Draw numbers
         cr.set_font_size(16.0 * scale);
@@ -87,13 +58,50 @@ fn build_ui(app: &Application) {
         );
         cr.set_source_color(&text_black);
         cr.move_to(x + 2.0 * scale, y + 14.0 * scale);
-        cr.show_text("4");
+        let _ = cr.show_text("4");
+
+        cr.move_to(x + (63.0 - 12.0) * scale, y + (88.0 - 4.0) * scale);
+        let _ = cr.show_text("4");
     });
 
+    return card;
+}
+
+fn build_ui(app: &Application) {
+    let card = create_card();
     // Add buttons to `gtk_box`
     let playarea = gtk::Fixed::builder().height_request(800).build();
     playarea.add_css_class("playarea");
     playarea.put(&card, 50.0, 50.0);
+
+    // Deal card button
+    let button = Button::builder()
+        .label("Deal card")
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+
+    button.add_css_class("deal_button");
+
+    button.connect_clicked({
+        let playarea = playarea.downgrade();
+
+        move |_| {
+            if let Some(playarea) = playarea.upgrade() {
+                let card = create_card();
+                let mut rng = rand::thread_rng();
+                let x: f64 = rng.gen();
+                let y: f64 = rng.gen();
+
+                playarea.put(&card, x * 0.0, y * 0.0);
+                playarea.move_(&card, x * 600.0, y * 600.0);
+            } else {
+                println!("The Vec has been dropped.");
+            }
+        }
+    });
 
     let layout = gtk::Box::builder()
         .orientation(Orientation::Vertical)
